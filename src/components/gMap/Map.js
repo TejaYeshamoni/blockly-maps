@@ -18,13 +18,35 @@ const Map = ({ paths, stops }) => {
   const [progress, setProgress] = useState(null);
   const [map, setMap] = useState(null);
   const velocity = 27; // 100km per hour
-  let initialDate;
-  let interval = null;
+  let initialDate = useState(new Date())[0];
+  let interval = useState(null)[0];
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY, // Add your API key here
     libraries: ['geometry']
   });
+
+  const calculatePath = useCallback(() => {
+    if (window.google) {
+      paths = paths.map((coordinates, i, array) => {
+        if (i === 0) {
+          return { ...coordinates, distance: 0 };
+        }
+        const { lat: lat1, lng: lng1 } = coordinates;
+        const latLong1 = new window.google.maps.LatLng(lat1, lng1);
+
+        const { lat: lat2, lng: lng2 } = array[0];
+        const latLong2 = new window.google.maps.LatLng(lat2, lng2);
+
+        const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
+          latLong1,
+          latLong2
+        );
+
+        return { ...coordinates, distance };
+      });
+    }
+  }, [paths]);
 
   useEffect(() => {
     if (isLoaded && window.google) {
@@ -35,7 +57,7 @@ const Map = ({ paths, stops }) => {
         interval && window.clearInterval(interval);
       }
     }
-  }, [paths, isLoaded]);
+  }, [isLoaded, calculatePath, interval]);
 
   const getDistance = () => {
     const differentInTime = (new Date() - initialDate) / 1000; // seconds
@@ -87,39 +109,14 @@ const Map = ({ paths, stops }) => {
     setProgress(progress.concat(position));
   };
 
-  const calculatePath = () => {
-    if (window.google) {
-      paths = paths.map((coordinates, i, array) => {
-        if (i === 0) {
-          return { ...coordinates, distance: 0 };
-        }
-        const { lat: lat1, lng: lng1 } = coordinates;
-        const latLong1 = new window.google.maps.LatLng(lat1, lng1);
-
-        const { lat: lat2, lng: lng2 } = array[0];
-        const latLong2 = new window.google.maps.LatLng(lat2, lng2);
-
-        const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
-          latLong1,
-          latLong2
-        );
-
-        return { ...coordinates, distance };
-      });
+  const startSimulation = useCallback(() => {
+    if (interval) {
+      window.clearInterval(interval);
     }
-  };
-
-  const startSimulation = useCallback(
-    () => {
-      if (interval) {
-        window.clearInterval(interval);
-      }
-      setProgress(null);
-      initialDate = new Date();
-      interval = window.setInterval(moveObject, 1000);
-    },
-    [interval, initialDate]
-  );
+    setProgress(null);
+    initialDate = new Date();
+    interval = window.setInterval(moveObject, 1000);
+  }, [interval, initialDate]);
 
   const mapUpdate = () => {
     if (window.google) {
@@ -161,7 +158,7 @@ const Map = ({ paths, stops }) => {
         marker.style.transform = `rotate(${actualAngle}deg)`;
       }
     }
-  }
+  };
 
   if (!isLoaded) return <div>Loading...</div>;
 
